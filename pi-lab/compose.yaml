@@ -1,0 +1,282 @@
+services:
+  # Reverse Proxy
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - homelab
+
+  # Media Services
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8096:8096"
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      - /mnt/nas/Movies:/media/movies
+    environment:
+      - JELLYFIN_PublishedServerUrl=https://jellyfin.streetgeek.media
+    networks:
+      - homelab
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13378:80"
+    volumes:
+      - audiobookshelf_config:/config
+      - audiobookshelf_metadata:/metadata
+      - /mnt/nas/Audiobooks:/audiobooks
+      - /mnt/nas/Podcasts:/podcasts
+    networks:
+      - homelab
+
+  # Immich (central Postgres + Redis on mint-mini)
+  immich:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:2283:3001"
+    volumes:
+      - immich_upload:/usr/src/app/upload
+      - /mnt/nas/Pictures:/usr/src/app/upload/library
+    environment:
+      - DB_HOSTNAME=100.85.30.25
+      - DB_USERNAME=immich_user
+      - DB_PASSWORD=${IMMICH_PASSWORD}
+      - DB_DATABASE_NAME=immich
+      - REDIS_HOSTNAME=100.85.30.25
+    networks:
+      - homelab
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=100.85.30.25
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n_user
+      - DB_POSTGRESDB_PASSWORD=${N8N_PASSWORD}
+    networks:
+      - homelab
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"
+    volumes:
+      - vaultwarden_data:/data
+    environment:
+      - WEBSOCKET_ENABLED=true
+      - DATABASE_URL=postgres://vaultwarden_user:${VW_PASSWORD}@100.85.30.25:5432/vaultwarden
+      - DOMAIN=https://pi.cuttlefish-gorgon.ts.net/vault
+    networks:
+      - homelab
+
+  actual-budget:
+    image: actualbudget/actual-server:latest
+    container_name: actual-budget
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5006:5006"
+    volumes:
+      - actual_data:/data
+    environment:
+      - DATABASE_URL=postgres://actualbudget_user:${AB_PASSWORD}@100.85.30.25:5432/actualbudget
+    networks:
+      - homelab
+
+#  activitywatch:
+#    build:
+#      context: ./aw-server-rust
+      #dockerfile: Dockerfile
+#      args:
+#        AW_SERVER_RUST_REF: 8e369e7d18fc198badde97f4a21011767fa2ccc8
+#    container_name: activitywatch
+#    restart: unless-stopped
+#    ports:
+#      - "127.0.0.1:5600:5600"
+#    volumes:
+      #- aw_data:/root/.activitywatch
+#    networks:
+#      - homelab
+
+  firefly:
+    image: fireflyiii/core:latest
+    container_name: firefly
+    restart: unless-stopped
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=100.85.30.25
+      - DB_PORT=5432
+      - DB_DATABASE=firefly
+      - DB_USERNAME=firefly_user
+      - DB_PASSWORD=${FIREFLY_PASSWORD}
+      - APP_KEY=${FIREFLY_APP_KEY}
+      - TRUSTED_PROXIES=**
+      - APP_PROXY=true
+    volumes:
+      - firefly_upload:/var/www/html/storage/upload
+    networks:
+      - homelab
+    expose:
+      - "8080"
+
+
+#  nginx-firefly:
+#    image: nginx:alpine
+#    container_name: nginx-firefly
+#    restart: unless-stopped
+#    ports:
+#      - "127.0.0.1:8088:80"
+#    volumes:
+#      - ./nginx-firefly.conf:/etc/nginx/conf.d/default.conf
+#    networks:
+#      - homelab
+#    depends_on:
+#      - firefly
+
+  kimai:
+    image: kimai/kimai2:fpm
+    container_name: kimai
+    restart: unless-stopped
+    environment:
+      - APP_URL=https://pi.cuttlefish-gorgon.ts.net/kimai
+      - DATABASE_URL=mysql://kimai:${KIMAI_PASSWORD}@100.85.30.25:3306/kimai
+      - APP_ENV=prod
+      - TRUSTED_PROXIES=0.0.0.0/0
+      - TRUSTED_HOSTS=^pi\.cuttlefish-gorgon\.ts\.net$
+    volumes:
+      - kimai_data:/opt/kimai/var
+    networks:
+      - homelab
+
+  nginx-kimai:
+    image: nginx:alpine
+    container_name: nginx-kimai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - ./nginx-kimai.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - homelab
+    depends_on:
+      - kimai
+
+
+  # ---------------- Local DB for Plane / NocoDB / Docmost ----------------
+  postgres-local:
+    image: postgres:15
+    container_name: postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${LOCAL_PG_PASSWORD}
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    networks:
+      - homelab
+
+  init-postgres-local:
+    image: alpine:latest
+    env_file: .env
+    depends_on:
+      postgres-local:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    command: sh -c "
+      apk add --no-cache gettext docker-cli && \
+      envsubst '\${PLANE_PASSWORD} \${NOCODB_PASSWORD} \${DOCMOST_PASSWORD}' < /app/postgres-init-local.sql \
+      | docker exec -i postgres-local psql -U admin"
+
+  #plane:
+  #  image: makeplane/plane:latest
+  #  container_name: plane
+  #  restart: unless-stopped
+  #  ports:
+  #    - "127.0.0.1:8090:8000"
+  #  environment:
+  #    - DATABASE_URL=postgres://plane_user:${PLANE_PASSWORD}@postgres-local:5432/plane
+ #  depends_on:
+ #     - init-postgres-local
+ #   networks:
+ #     - homelab
+
+  nocodb:
+    image: nocodb/nocodb:latest
+    container_name: nocodb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8089:8080"
+    environment:
+      - NC_DB=pg://nocodb_user:${NOCODB_PASSWORD}@postgres-local:5432/nocodb
+    volumes:
+      - nocodb_data:/usr/app/data
+    depends_on:
+      - init-postgres-local
+    networks:
+      - homelab
+
+  docmost:
+    image: docmost/docmost:latest
+    container_name: docmost
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8065:3000"
+    environment:
+      - DATABASE_URL=postgres://docmost_user:${DOCMOST_PASSWORD}@postgres-local:5432/docmost
+    volumes:
+      - docmost_data:/var/lib/docmost
+    depends_on:
+      - init-postgres-local
+    networks:
+      - homelab
+
+volumes:
+  caddy_data:
+  caddy_config:
+  jellyfin_config:
+  jellyfin_cache:
+  audiobookshelf_config:
+  audiobookshelf_metadata:
+  immich_upload:
+  n8n_data:
+  vaultwarden_data:
+  actual_data:
+  firefly_upload:
+  kimai_data:
+  postgres_local_data:
+  nocodb_data:
+  docmost_data:
+  aw_data:
+  aw_config:
+
+networks:
+  homelab:
+    driver: bridge
