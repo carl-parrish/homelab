@@ -1,0 +1,55 @@
+{
+    servers {
+        trusted_proxies static 127.0.0.1
+    }
+}
+
+:80 {
+    log
+
+    # --- Jellyfin ---
+    @jellyfin host jellyfin.streetgeek.media
+    handle @jellyfin {
+        reverse_proxy jellyfin:8096
+    }
+
+    # --- Photos (Immich) ---
+    @photos host photos.carlparrish.com
+    handle @photos {
+        reverse_proxy immich:3001
+        request_body {
+            max_size 10GB
+        }
+    }
+
+    # --- Audiobooks ---
+    @audiobooks host audiobooks.streetgeek.media
+    handle @audiobooks {
+        reverse_proxy audiobookshelf:80
+    }
+
+    # --- Redirect root domain -> Jellyfin ---
+    @streetgeek host streetgeek.media
+    handle @streetgeek {
+        redir https://jellyfin.streetgeek.media{uri} permanent
+    }
+
+# --- Pi Services ---
+@pi_host host pi.cuttlefish-gorgon.ts.net
+handle @pi_host {
+    # --- Kimai ---
+    # Match /kimai and /kimai/... (both work) and strip "/kimai"
+    handle_path /kimai* {
+        reverse_proxy nginx-kimai:80
+    }
+
+    # --- Firefly ---
+    # Match /firefly and /firefly/... (both work) and strip "/firefly"
+    handle_path /firefly* {
+        reverse_proxy nginx-firefly:8080
+    }
+
+    # Fallback for just bare https://pi...
+    respond "Pi Homelab Services" 200
+  }
+}
