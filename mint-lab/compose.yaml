@@ -1,0 +1,129 @@
+# This file defines the database services and x86_64-specific applications
+# running on the Mac Mini. Convex has been added.
+services:
+  postgres:
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    container_name: postgres-main
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: 'admin'
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - homelab
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb-main
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - homelab
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis-main
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - homelab
+  
+      # --- CONVEX STACK ---
+  convex-backend:
+    # Using the official image name and a specific SHA pin for stability
+    image: ghcr.io/get-convex/convex-backend:00bd92723422f3bff968230c94ccdeb8c1719832
+    container_name: convex-backend
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      # Port for the backend API
+      - "127.0.0.1:8091:3210"
+    volumes:
+      # Using the path from the official example
+      - convex_data:/convex/data
+    environment:
+      # Tells Convex where its own public-facing API is
+      CONVEX_CLOUD_ORIGIN: 'http://localhost:8091'
+      # Tells Convex what database to use
+      POSTGRES_URL: ${CONVEX_POSTGRES_URL}
+      DO_NOT_REQUIRE_SSL: 'true'
+      # Disables anonymous telemetry
+      DISABLE_BEACON: 'true'
+    networks:
+      - homelab
+    depends_on:
+      postgres:
+        condition: service_healthy
+      init-postgres:
+        condition: service_completed_successfully
+    healthcheck:
+      # Docker will check this URL to see if the service is healthy
+      test: curl -f http://localhost:3210/version
+      interval: 5s
+      start_period: 10s
+
+  convex-dashboard:
+    # The web UI for managing Convex
+    image: ghcr.io/get-convex/convex-dashboard:33cef775a8a6228cbacee4a09ac2c4073d62ed13
+    container_name: convex-dashboard
+    restart: unless-stopped
+    stop_grace_period: 10s
+    stop_signal: SIGINT
+    ports:
+      # Port for you to access the dashboard in your browser
+      - "127.0.0.1:6791:6791"
+    environment:
+      # Tells the dashboard where to find the backend API
+      NEXT_PUBLIC_DEPLOYMENT_URL: 'http://localhost:8091'
+    networks:
+      - homelab
+    depends_on:
+      # This is crucial: it waits for the backend to be healthy before starting
+      convex-backend:
+        condition: service_healthy
+  init-postgres:
+    image: alpine:latest
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    command: sh -c "apk add --no-cache fish gettext docker-cli && fish init-dbs.fish postgres"
+  init-mariadb:
+    image: alpine:latest
+    env_file: .env
+    depends_on:
+      mariadb:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    command: sh -c "apk add --no-cache fish gettext docker-cli && fish init-dbs.fish mariadb"
+
+volumes:
+  postgres_data:
+  mariadb_data:
+  convex_data:
+
+networks:
+  homelab:
+    driver: bridge
