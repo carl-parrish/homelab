@@ -1,15 +1,23 @@
 services:
   # Reverse Proxy
   caddy:
-    image: caddy:latest
+    build:
+      context: .
+      dockerfile: Caddy.dockerfile
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
     container_name: caddy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:80"
+      - "80:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
+      - kimai_app:/opt/kimai:ro
+      - phpsock:/var/run/php
+#      - ./pi.cuttlefish-gorgon.ts.net.crt:/etc/caddy/cert.pem:ro
+#      - ./pi.cuttlefish-gorgon.ts.net.key:/etc/caddy/key.pem:ro
     networks:
       - homelab
 
@@ -25,7 +33,7 @@ services:
       - jellyfin_cache:/cache
       - /mnt/nas/Movies:/media/movies
     environment:
-      - JELLYFIN_PublishedServerUrl=https://jellyfin.streetgeek.media
+      - JELLYFIN_PublishedServerUrl=https://movies.streetgeek.media
     networks:
       - homelab
 
@@ -40,6 +48,22 @@ services:
       - audiobookshelf_metadata:/metadata
       - /mnt/nas/Audiobooks:/audiobooks
       - /mnt/nas/Podcasts:/podcasts
+    networks:
+      - homelab
+
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web:latest
+    container_name: calibre-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Phoenix
+    volumes:
+      - calibre_data:/config
+      - /mnt/nas/Ebooks:/books
     networks:
       - homelab
 
@@ -136,7 +160,9 @@ services:
       - DB_PASSWORD=${FIREFLY_PASSWORD}
       - APP_KEY=${FIREFLY_APP_KEY}
       - TRUSTED_PROXIES=**
+      - TRUSTED_HEADERS=FORWARDED,FORWARDED_PROTO,FORWARDED_HOST
       - APP_PROXY=true
+      - APP_URL=https://pi.cuttlefish-gorgon.ts.net/firefly
     volumes:
       - firefly_upload:/var/www/html/storage/upload
     networks:
@@ -144,47 +170,51 @@ services:
     expose:
       - "8080"
 
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:7.0.1
+    container_name: forgejo
+    restart: unless-stopped
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - DB_TYPE=postgres
+      - DB_HOST=100.85.30.25 # mint-mini (tailscale IP)
+      - DB_PORT=5432
+      - DB_NAME=forgejo
+      - DB_USER=forgejo_user
+      - DB_PASSWD=${FORGEJO_PASSWORD}
+      - ROOT_URL=https://git.deeplydigital.net/
+      - SSH_DOMAIN=git.deeplydigital.net
+      - SSH_PORT=2222 # external port users will connect to
+    volumes:
+      - /mnt/nas/repo:/data # store repos on NAS
+    ports:
+      - "3000:3000" # web UI (proxied via Caddy)
+      - "2222:22" # SSH git access
+    networks:
+      - homelab
 
-#  nginx-firefly:
-#    image: nginx:alpine
-#    container_name: nginx-firefly
-#    restart: unless-stopped
-#    ports:
-#      - "127.0.0.1:8088:80"
-#    volumes:
-#      - ./nginx-firefly.conf:/etc/nginx/conf.d/default.conf
-#    networks:
-#      - homelab
-#    depends_on:
-#      - firefly
+
 
   kimai:
     image: kimai/kimai2:fpm
     container_name: kimai
     restart: unless-stopped
     environment:
-      - APP_URL=https://pi.cuttlefish-gorgon.ts.net/kimai
+      - APP_URL=https://invoices.deeplydigital.net
       - DATABASE_URL=mysql://kimai:${KIMAI_PASSWORD}@100.85.30.25:3306/kimai
       - APP_ENV=prod
       - TRUSTED_PROXIES=0.0.0.0/0
-      - TRUSTED_HOSTS=^pi\.cuttlefish-gorgon\.ts\.net$
+      - TRUSTED_HOSTS=^invoices\.deeplydigital\.net$
+      - SCRIPT_NAME=/kimai
     volumes:
+      - kimai_app:/opt/kimai
       - kimai_data:/opt/kimai/var
+      - phpsock:/var/run/php
+      - ./kimai-fpm-socket.conf:/usr/local/etc/php-fpm.d/zz-rocket.conf:ro
     networks:
       - homelab
 
-  nginx-kimai:
-    image: nginx:alpine
-    container_name: nginx-kimai
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8081:80"
-    volumes:
-      - ./nginx-kimai.conf:/etc/nginx/conf.d/default.conf
-    networks:
-      - homelab
-    depends_on:
-      - kimai
 
 
   # ---------------- Local DB for Plane / NocoDB / Docmost ----------------
@@ -265,12 +295,15 @@ volumes:
   jellyfin_cache:
   audiobookshelf_config:
   audiobookshelf_metadata:
+  calibre_data:
   immich_upload:
   n8n_data:
   vaultwarden_data:
   actual_data:
   firefly_upload:
+  kimai_app:
   kimai_data:
+  phpsock:
   postgres_local_data:
   nocodb_data:
   docmost_data:
