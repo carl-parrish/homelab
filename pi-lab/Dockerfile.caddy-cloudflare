@@ -1,0 +1,81 @@
+# =====================================
+# SOLUTION 1: Use Pre-built Image (RECOMMENDED)
+# =====================================
+# This is the simplest and most reliable approach
+# Uses a maintained image with proper version compatibility
+
+FROM ghcr.io/caddybuilds/caddy-cloudflare:latest
+
+# Copy your Caddyfile
+COPY Caddyfile /etc/caddy/Caddyfile
+
+# Create directory for data persistence
+RUN mkdir -p /data /config
+
+# Expose ports
+EXPOSE 80 443
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD caddy validate --config /etc/caddy/Caddyfile || exit 1
+
+# Start Caddy
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+
+# =====================================
+# SOLUTION 2: Multi-stage xcaddy build
+# =====================================
+# Use this if you need more control over the build process
+
+# FROM caddy:2-builder AS builder
+# 
+# # Build Caddy with Cloudflare DNS plugin
+# RUN xcaddy build \
+#     --with github.com/caddy-dns/cloudflare
+# 
+# # Production stage
+# FROM caddy:2-alpine
+# 
+# # Copy the custom Caddy binary
+# COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+# 
+# # Copy your Caddyfile
+# COPY Caddyfile /etc/caddy/Caddyfile
+# 
+# # Create directory for data persistence
+# RUN mkdir -p /data /config
+# 
+# # Expose ports
+# EXPOSE 80 443 443/udp
+# 
+# # Health check
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#   CMD caddy validate --config /etc/caddy/Caddyfile || exit 1
+# 
+# # Start Caddy
+# CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+
+# =====================================
+# SOLUTION 3: Specific version build (for compatibility testing)
+# =====================================
+# Use this if you need to pin to specific versions
+
+# FROM caddy:2.8.0-builder AS builder
+# 
+# # Build with specific module version
+# RUN xcaddy build \
+#     --with github.com/caddy-dns/cloudflare
+# 
+# FROM caddy:2.8.0-alpine
+# 
+# # Copy the custom binary
+# COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+# 
+# # Copy configuration
+# COPY Caddyfile /etc/caddy/Caddyfile
+# 
+# # Setup
+# RUN mkdir -p /data /config
+# EXPOSE 80 443
+# 
+# CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
