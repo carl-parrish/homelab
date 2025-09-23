@@ -1,5 +1,5 @@
-# Use a specific, newer Go version as the builder
-FROM golang:1.22-alpine AS builder
+# Use the specific Go version required by the plugin
+FROM golang:1.23-alpine AS builder
 
 # Install git, which is a dependency for xcaddy
 RUN apk add --no-cache git
