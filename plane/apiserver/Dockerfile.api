@@ -17,6 +17,12 @@ RUN apk add --no-cache \
 COPY requirements.txt ./
 COPY requirements ./requirements
 RUN apk add --no-cache libffi-dev
+
+# Install a modern Rust toolchain
+RUN apk add curl
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
 RUN apk add --no-cache --virtual .build-deps \
     "bash~=5.2" \
     "g++" \
