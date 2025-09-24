@@ -1,0 +1,135 @@
+
+graph TB
+    %% Internet and Router
+    Internet[Internet]
+    Router[GL-iNet Slate AX Router<br/>GL-SFT1200 Opal]
+    
+    %% Tailscale VPN Overlay
+    subgraph Tailscale["Tailscale VPN Overlay Network"]
+        direction TB
+        
+        %% Primary Devices
+        MacMini[mac-mini<br/>M2 Pro, 64GB RAM<br/>Primary Work Machine<br/>Jellyfin Transcoding]
+        MintMini[mint-mini<br/>Late 2014 Mac Mini<br/>1TB SSD<br/>Docker Host (x86_64)]
+        Pi[pi<br/>Raspberry Pi 5<br/>8GB RAM, 500GB NVMe<br/>Main Docker Server (ARM)]
+        NAS[Buffalo LS220D NAS<br/>8TB Storage<br/>SMB Shares]
+        
+        %% Mobile/Portable Devices
+        Pixelbook[Pixelbook Go]
+        Duet[Lenovo Duet 5]
+        Pixel[Google Pixel 8 Pro]
+        Tablet[Google Pixel Tablet]
+        
+        %% Remote Access
+        RemoteRouter[GL-SFT1200 Opal<br/>Remote Access Point]
+    end
+    
+    %% Docker Services on Pi (ARM)
+    subgraph PiServices["Docker Services on Pi (ARM)"]
+        direction TB
+        
+        %% Workflow & Automation
+        N8N[N8N<br/>Port: 5678<br/>Workflow Automation]
+        ActivityWatch[ActivityWatch Server<br/>Port: 5600<br/>Time Tracking]
+        
+        %% Media & Content
+        Jellyfin[Jellyfin<br/>Port: 8096<br/>Media Server<br/>Direct Play Only]
+        
+        %% Finance & Business
+        ActualBudget[Actual Budget<br/>Port: 5006<br/>Personal Finance]
+        
+        %% Security & Tools
+        Vaultwarden[Vaultwarden<br/>Port: 8080<br/>Password Manager]
+        LanguageTool[LanguageTool<br/>Port: 8010<br/>Grammar Checker]
+        Vale[Vale<br/>CLI Tool<br/>Prose Linter]
+        
+        %% Development & Collaboration
+        Docmost[Docmost<br/>Wiki Platform]
+        Plane[Plane<br/>Project Management]
+        Nocodb[NocoDB<br/>No-Code Database]
+        Paperless[Paperless-ngx<br/>Document Management]
+    end
+
+    %% Docker Services on mint-mini (x86_64)
+    subgraph MintServices["Docker Services on mint-mini (x86_64)"]
+        direction TB
+        Convex[Convex<br/>Reactive Backend]
+    end
+    
+    %% Databases on mint-mini
+    subgraph MintDatabases["Databases on mint-mini"]
+        direction TB
+        subgraph PostgresDBs["PostgreSQL"]
+            ConvexDB[(Convex DB)]
+            VaultwardenDB[(Vaultwarden DB)]
+            ActualDB[(Actual Budget DB)]
+            FireflyDB[(Firefly III DB)]
+            N8NDB[(N8N DB)]
+            ImmichDB[(Immich DB)]
+            ForgejoDB[(Forgejo DB)]
+        end
+        subgraph MariaDBs["MariaDB"]
+            KimaiDB[(Kimai DB)]
+        end
+        subgraph RedisCaches["Redis"]
+            RedisCache[(Redis Cache)]
+        end
+    end
+    
+    %% Local Databases on Pi
+    subgraph PiDatabases["Local Databases (Pi NVMe)"]
+        direction TB
+        PlaneDB[(Plane DB)]
+        NocodbDB[(NocoDB DB)]
+        DocmostDB[(Docmost DB)]
+        PaperlessDB[(Paperless DB)]
+    end
+    
+    %% Connections
+    Internet --> Router
+    Router -.-> Tailscale
+    
+    %% Tailscale connections
+    MacMini -.-> Tailscale
+    MintMini -.-> Tailscale
+    Pi -.-> Tailscale
+    NAS -.-> Tailscale
+    Pixelbook -.-> Tailscale
+    Duet -.-> Tailscale
+    Pixel -.-> Tailscale
+    RemoteRouter -.-> Tailscale
+    
+    %% Local SMB connections
+    NAS -->|SMB Share| MacMini
+    NAS -->|SMB Share| Pi
+    
+    %% Service to database connections
+    Pi --> PiServices
+    PiServices --> PiDatabases
+    MintMini --> MintServices
+    MintServices --> MintDatabases
+
+    %% Remote database connections
+    Vaultwarden -.->|Network| VaultwardenDB
+    N8N -.->|Network| N8NDB
+    ActualBudget -.->|Network| ActualDB
+    Convex -.->|Network| ConvexDB
+    
+    %% RustDesk remote access
+    MacMini -.->|RustDesk| Pixelbook
+    MacMini -.->|RustDesk| Duet
+    Pi -.->|RustDesk| Pixel
+    
+    %% Media transcoding workflow
+    MacMini -->|Hardware Transcoding| Jellyfin
+    
+    %% Styling
+    classDef primaryDevice fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#4a148c,stroke-width:1px
+    classDef database fill:#fff3e0,stroke:#e65100,stroke-width:1px
+    classDef network fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    
+    class MacMini,MintMini,Pi,NAS primaryDevice
+    class N8N,ActivityWatch,Jellyfin,ActualBudget,Vaultwarden,LanguageTool,Vale,Convex,Docmost,Plane,Nocodb,Paperless service
+    class VaultwardenDB,KimaiDB,ActualDB,FireflyDB,PlaneDB,NocodbDB,DocmostDB,PaperlessDB,ConvexDB,N8NDB,ImmichDB,ForgejoDB,RedisCache database
+    class Tailscale,Router network
