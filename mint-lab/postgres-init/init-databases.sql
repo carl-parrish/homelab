@@ -10,6 +10,7 @@ CREATE USER immich_user WITH PASSWORD '${IMMICH_PASSWORD}';
 CREATE USER n8n_user WITH PASSWORD '${N8N_PASSWORD}';
 CREATE USER firefly_user WITH PASSWORD '${FIREFLY_PASSWORD}';
 CREATE USER forgejo_user WITH PASSWORD '${FORGEJO_PASSWORD}';
+CREATE USER plane_user WITH PASSWORD '${PLANE_PASSWORD}';
 
 CREATE DATABASE convex_self_hosted OWNER convex_user;
 CREATE DATABASE vaultwarden OWNER vaultwarden_user;
@@ -18,3 +19,4 @@ CREATE DATABASE immich OWNER immich_user;
 CREATE DATABASE n8n OWNER n8n_user;
 CREATE DATABASE firefly OWNER firefly_user;
 CREATE DATABASE forgejo OWNER forgejo_user;
+CREATE DATABASE plane OWNER plane_user;
