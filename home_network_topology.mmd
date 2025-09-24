@@ -10,8 +10,8 @@ graph TB
         
         %% Primary Devices
         MacMini[mac-mini<br/>M2 Pro, 64GB RAM<br/>Primary Work Machine<br/>Jellyfin Transcoding]
-        MintMini[mint-mini<br/>Late 2014 Mac Mini<br/>1TB SSD<br/>Remote Database Host]
-        Pi[pi<br/>Raspberry Pi 5<br/>8GB RAM, 500GB NVMe<br/>Main Docker Server]
+        MintMini[mint-mini<br/>Late 2014 Mac Mini<br/>1TB SSD<br/>Docker Host (x86_64)]
+        Pi[pi<br/>Raspberry Pi 5<br/>8GB RAM, 500GB NVMe<br/>Main Docker Server (ARM)]
         NAS[Buffalo LS220D NAS<br/>8TB Storage<br/>SMB Shares]
         
         %% Mobile/Portable Devices
@@ -24,8 +24,8 @@ graph TB
         RemoteRouter[GL-SFT1200 Opal<br/>Remote Access Point]
     end
     
-    %% Docker Services on Pi
-    subgraph PiServices["Docker Services on Pi"]
+    %% Docker Services on Pi (ARM)
+    subgraph PiServices["Docker Services on Pi (ARM)"]
         direction TB
         
         %% Workflow & Automation
@@ -44,31 +44,45 @@ graph TB
         Vale[Vale<br/>CLI Tool<br/>Prose Linter]
         
         %% Development & Collaboration
-        Convex[Convex<br/>Reactive Backend]
         Docmost[Docmost<br/>Wiki Platform]
         Plane[Plane<br/>Project Management]
         Nocodb[NocoDB<br/>No-Code Database]
         Paperless[Paperless-ngx<br/>Document Management]
     end
-    
-    %% Remote Databases on mint-mini
-    subgraph RemoteDB["Remote Databases (mint-mini)"]
+
+    %% Docker Services on mint-mini (x86_64)
+    subgraph MintServices["Docker Services on mint-mini (x86_64)"]
         direction TB
-        VaultwardenDB[(Vaultwarden DB)]
-        KimaiDB[(Kimai DB)]
-        ActualDB[(Actual Budget DB)]
-        FireflyDB[(Firefly III DB)]
+        Convex[Convex<br/>Reactive Backend]
+    end
+    
+    %% Databases on mint-mini
+    subgraph MintDatabases["Databases on mint-mini"]
+        direction TB
+        subgraph PostgresDBs["PostgreSQL"]
+            ConvexDB[(Convex DB)]
+            VaultwardenDB[(Vaultwarden DB)]
+            ActualDB[(Actual Budget DB)]
+            FireflyDB[(Firefly III DB)]
+            N8NDB[(N8N DB)]
+            ImmichDB[(Immich DB)]
+            ForgejoDB[(Forgejo DB)]
+        end
+        subgraph MariaDBs["MariaDB"]
+            KimaiDB[(Kimai DB)]
+        end
+        subgraph RedisCaches["Redis"]
+            RedisCache[(Redis Cache)]
+        end
     end
     
     %% Local Databases on Pi
-    subgraph LocalDB["Local Databases (Pi NVMe)"]
+    subgraph PiDatabases["Local Databases (Pi NVMe)"]
         direction TB
         PlaneDB[(Plane DB)]
         NocodbDB[(NocoDB DB)]
         DocmostDB[(Docmost DB)]
-        ConvexDB[(Convex DB)]
         PaperlessDB[(Paperless DB)]
-        RedisCache[(Redis Cache)]
     end
     
     %% Connections
@@ -91,12 +105,15 @@ graph TB
     
     %% Service to database connections
     Pi --> PiServices
-    PiServices --> LocalDB
-    
+    PiServices --> PiDatabases
+    MintMini --> MintServices
+    MintServices --> MintDatabases
+
     %% Remote database connections
     Vaultwarden -.->|Network| VaultwardenDB
-    N8N -.->|Network| KimaiDB
+    N8N -.->|Network| N8NDB
     ActualBudget -.->|Network| ActualDB
+    Convex -.->|Network| ConvexDB
     
     %% RustDesk remote access
     MacMini -.->|RustDesk| Pixelbook
@@ -114,5 +131,5 @@ graph TB
     
     class MacMini,MintMini,Pi,NAS primaryDevice
     class N8N,ActivityWatch,Jellyfin,ActualBudget,Vaultwarden,LanguageTool,Vale,Convex,Docmost,Plane,Nocodb,Paperless service
-    class VaultwardenDB,KimaiDB,ActualDB,FireflyDB,PlaneDB,NocodbDB,DocmostDB,ConvexDB,PaperlessDB,RedisCache database
+    class VaultwardenDB,KimaiDB,ActualDB,FireflyDB,PlaneDB,NocodbDB,DocmostDB,PaperlessDB,ConvexDB,N8NDB,ImmichDB,ForgejoDB,RedisCache database
     class Tailscale,Router network
