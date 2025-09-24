@@ -89,4 +89,8 @@ invoices.deeplydigital.net {
 		file_server
 }
 
+planning.deeplydigital.net {
+    reverse_proxy proxy:80
+}
+
 
