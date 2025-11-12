@@ -14,6 +14,18 @@ The choice of operating system is critical for ensuring ARM64 compatibility. The
 
 ## Service Deployment Guides
 
+### Caddy: Reverse Proxy with Automated SSL
+
+Caddy is a powerful, modern reverse proxy that is particularly well-suited for a homelab environment due to its simple configuration and automatic HTTPS. In this deployment, Caddy serves as the single entry point for all web-based services, routing traffic to the appropriate container based on the hostname.
+
+A primary goal of this setup is to use custom, memorable domain names (e.g., `movies.streetgeek.media`) for services that are kept private on the Tailscale network. This creates a significant challenge for standard SSL certificate issuance. The default method used by Let's Encrypt (the HTTP-01 challenge) requires the server to be accessible from the public internet, which is not the case here.
+
+The solution is to use the **DNS-01 challenge**. This method proves domain ownership by having Caddy create a temporary DNS record using the DNS provider's API, rather than by serving a file over HTTP. This requires a DNS provider that offers API access, such as Cloudflare.
+
+While it is possible to build a custom Caddy image with the required DNS plugin, this process can be fraught with build-time dependency issues. After significant troubleshooting, the most reliable and recommended solution is to use a community-maintained, pre-built Docker image that already includes the necessary plugins. For this deployment, we use **`ghcr.io/caddybuilds/caddy-cloudflare:latest`**. This image bypasses the need for a custom `Dockerfile` entirely.
+
+The configuration in `docker-compose.yaml` specifies this image and passes the necessary Cloudflare API token as an environment variable (`CLOUDFLARE_API_TOKEN`). The `Caddyfile` is then configured with a global `tls` block that instructs Caddy to use the `cloudflare` DNS provider for all certificate operations. This setup provides robust, automated SSL for all private services using their custom domain names.
+
 ### n8n: Workflow Automation
 
 n8n is a powerful, node-based workflow automation tool that serves as an open-source alternative to services like Zapier. For a Raspberry Pi 5 deployment, a model with at least 4GB of RAM is sufficient for light to medium workloads, though 8GB is preferable for more complex automations or when running alongside a dedicated database. Storage requirements start at a 32GB A2-class microSD card, but an SSD is highly recommended for performance and reliability of the Docker volume where workflow data is stored. The official `n8nio/n8n` Docker image is fully compatible with the ARM64 architecture, provided a 64-bit operating system is in use. While n8n defaults to an SQLite database, for enhanced scalability and performance, integrating a separate PostgreSQL container is a common practice. A basic Docker Compose configuration involves defining the n8n service, mapping port 5678, and creating a named volume for data persistence. Key environment variables include setting your timezone (`TZ`), enabling basic authentication for security (`N8N_BASIC_AUTH_ACTIVE`, `N8N_BASIC_AUTH_USER`, `N8N_BASIC_AUTH_PASSWORD`), and defining the host and protocol for proper operation within a local network.
