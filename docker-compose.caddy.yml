@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  caddy:
+    # SOLUTION 1: Use pre-built image (RECOMMENDED)
+    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
+    
+    # SOLUTION 2: Build from our Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.caddy-cloudflare
+    
+    container_name: caddy-cloudflare
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      # Required: Your Cloudflare API Token
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      
+      # Optional: Additional environment variables
+      - TZ=${TZ:-UTC}
+      - CADDY_INGRESS_NETWORKS=caddy
+    
+    # Ports
+    ports:
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    
+    # Volumes
+    volumes:
+      # Mount your Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      
+      # Persistent storage for certificates and data
+      - caddy_data:/data
+      - caddy_config:/config
+      
+      # Optional: Custom site files
+      # - ./html:/usr/share/caddy:ro
+    
+    # Networks
+    networks:
+      - caddy
+    
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Networks
+networks:
+  caddy:
+    name: caddy
+    driver: bridge
+
+# Named volumes for persistent storage
+volumes:
+  caddy_data:
+    name: caddy_data
+    driver: local
+  caddy_config:
+    name: caddy_config
+    driver: local
+
+# =====================================
+# ADDITIONAL SERVICES EXAMPLE
+# =====================================
+# Here's how you can add your other services that Caddy will proxy to
+# Uncomment and modify as needed:
+
+#   # Example: n8n service
+#   n8n:
+#     image: n8nio/n8n:latest
+#     restart: unless-stopped
+#     environment:
+#       - N8N_BASIC_AUTH_ACTIVE=true
+#       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+#       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+#       - TZ=${TZ:-UTC}
+#     volumes:
+#       - n8n_data:/home/node/.n8n
+#     networks:
+#       - caddy
+#     # Note: No ports exposed - accessed only through Caddy reverse proxy
+# 
+#   # Example: Vaultwarden service  
+#   vaultwarden:
+#     image: vaultwarden/server:latest
+#     restart: unless-stopped
+#     environment:
+#       - WEBSOCKET_ENABLED=true
+#       - SIGNUPS_ALLOWED=false
+#       - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+#       - TZ=${TZ:-UTC}
+#     volumes:
+#       - vaultwarden_data:/data
+#     networks:
+#       - caddy
+# 
+# volumes:
+#   n8n_data:
+#   vaultwarden_data:
