@@ -1,5 +1,5 @@
 (handle-proxy) {
-	header_up X-Forwarded-Proto https
+        header_up X-Forwarded-Proto https
 }
 
 (cloudflare-dns) {
@@ -8,96 +8,96 @@
     }
 }
 
-	# --- Audiobooks ---
-	audiobooks.streetgeek.media:80 {
-		import cloudflare-dns
-		reverse_proxy audiobookshelf:80
-	}
-   
-	# --- Jellyfin ---
-	movies.streetgeek.media {
-		import cloudflare-dns
-		reverse_proxy jellyfin:8096
-	}
+        # --- Audiobooks ---
+audiobooks.streetgeek.media {
+         import cloudflare-dns
+         reverse_proxy audiobookshelf:80
+}
+
+ # --- Jellyfin ---
+movies.streetgeek.media {
+      import cloudflare-dns
+      reverse_proxy jellyfin:8096
+}
 
   # --- Calibre ---
-  books.streetgeek.media {
-		import cloudflare-dns
+books.streetgeek.media {
+    import cloudflare-dns
     reverse_proxy calibre-web:8083
-  }
+}
 
-	# --- Photos (Immich) ---
+        # --- Photos (Immich) ---
 photos.carlparrish.com {
-		import cloudflare-dns
-	reverse_proxy immich:3001
-	request_body {
-		max_size 10GB
-	}
+                import cloudflare-dns
+        reverse_proxy immich:3001
+        request_body {
+                max_size 10GB
+        }
 }
 
-	# --- Vaultwarden --- 
-vault.carlparrish.com:80 {
-		import cloudflare-dns
-	reverse_proxy vaultwarden:80 {
-		import handle-proxy
-		header_up X-Forwarded-Prefix /vault
-	}
+        # --- Vaultwarden ---
+vault.carlparrish.com {
+                import cloudflare-dns
+        reverse_proxy vaultwarden:80 {
+                import handle-proxy
+                header_up X-Forwarded-Prefix /vault
+        }
 }
 
-	#--- Actual Budget ---
+        #--- Actual Budget ---
 budget.carlparrish.com {
-		import cloudflare-dns
-	reverse_proxy actual-budget:5006 {
-		import handle-proxy
-		header_up X-Forwarded-Prefix /budget
-	}
+                import cloudflare-dns
+        reverse_proxy actual-budget:5006 {
+                import handle-proxy
+                header_up X-Forwarded-Prefix /budget
+        }
 }
-  
+
   #--- Activity Watch ---
 aw.sourcecodesamurai.com {
-		import cloudflare-dns
+                import cloudflare-dns
     reverse_proxy activitywatch:5600
 }
 
 docs.sourcecodesamurai.com {
-		import cloudflare-dns
+                import cloudflare-dns
   reverse_proxy docmost:3000
 }
 
 noco.sourcecodesamurai.com {
-		import cloudflare-dns
+                import cloudflare-dns
   reverse_proxy nocodb:8080
 }
 
 n8n.sourcecodesamurai.com {
-		import cloudflare-dns
+                import cloudflare-dns
   reverse_proxy n8n:5678
 }
 
 
-		# --- Firefly ---
+                # --- Firefly ---
 funds.deeplydigital.net {
-		import cloudflare-dns
-	reverse_proxy firefly:8080 {
-		import handle-proxy
-		header_up X-Forwarded-Prefix /firefly
-	}
+                import cloudflare-dns
+        reverse_proxy firefly:8080 {
+                import handle-proxy
+                header_up X-Forwarded-Prefix /firefly
+        }
 }
 
     # --- Forgejo ---
 git.deeplydigital.net {
-		import cloudflare-dns
+                import cloudflare-dns
   reverse_proxy forgejo:3000
   encode gzip
 }
 
 
-		# --- Kimai ---
+                # --- Kimai ---
 invoices.deeplydigital.net {
-		import cloudflare-dns
-		root * /opt/kimai/public
-		php_fastcgi unix//var/run/php/php-fpm.sock
-		file_server
+                import cloudflare-dns
+                root * /opt/kimai/public
+                php_fastcgi unix//var/run/php/php-fpm.sock
+                file_server
 }
 
 planning.deeplydigital.net {
@@ -109,4 +109,4 @@ planning.deeplydigital.net {
 pi.cuttlefish-gorgon.ts.net {
     tls internal
     reverse_proxy jellyfin:8096
-}
+}⏎
