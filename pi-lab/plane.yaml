@@ -1,0 +1,148 @@
+services:
+  plane-api:
+    container_name: plane-api
+    build:
+      context: ../plane
+      dockerfile: ./apiserver/Dockerfile.api
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: ./bin/docker-entrypoint-api.sh
+    env_file:
+      - .env
+    networks:
+      - homelab
+    depends_on:
+      - postgres-local
+
+  plane-worker:
+    container_name: plane-bgworker
+    build:
+      context: ../plane
+      dockerfile: ./apiserver/Dockerfile.api
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: ./bin/docker-entrypoint-worker.sh
+    env_file:
+      - .env
+    networks:
+      - homelab
+    depends_on:
+      - plane-api
+
+  plane-beat-worker:
+    container_name: plane-beatworker
+    build:
+      context: ../plane
+      dockerfile: ./apiserver/Dockerfile.api
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: ./bin/docker-entrypoint-beat.sh
+    env_file:
+      - .env
+    networks:
+      - homelab
+    depends_on:
+      - plane-api
+
+  plane-migrator:
+    container_name: plane-migrator
+    build:
+      context: ../plane
+      dockerfile: ./apiserver/Dockerfile.api
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: "no"
+    command: ./bin/docker-entrypoint-migrator.sh
+    env_file:
+      - .env
+    networks:
+      - homelab
+    depends_on:
+      - postgres-local
+
+  plane-web:
+    container_name: plane-web
+    build:
+      context: ../plane
+      dockerfile: ./web/Dockerfile.web
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: node web/server.js web
+    networks:
+      - homelab
+    depends_on:
+      - plane-api
+
+  plane-admin:
+    container_name: plane-admin
+    build:
+      context: ../plane
+      dockerfile: ./admin/Dockerfile.admin
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: node admin/server.js admin
+    networks:
+      - homelab
+    depends_on:
+      - plane-api
+      - plane-web
+
+  plane-space:
+    container_name: plane-space
+    build:
+      context: ../plane
+      dockerfile: ./space/Dockerfile.space
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: node space/server.js space
+    networks:
+      - homelab
+    depends_on:
+      - plane-api
+      - plane-web
+
+  plane-live:
+    container_name: plane-live
+    build:
+      context: ../plane
+      dockerfile: ./live/Dockerfile.live
+      args:
+        DOCKER_BUILDKIT: 1
+    restart: always
+    command: node live/dist/server.js
+    networks:
+      - homelab
+
+  plane-mq:
+    container_name: plane-mq
+    image: rabbitmq:3.13.6-management-alpine
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - plane_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - homelab
+
+  plane-minio:
+    container_name: plane-minio
+    image: minio/minio
+    restart: always
+    command: server /export --console-address ":9090"
+    volumes:
+      - plane_uploads:/export
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+    networks:
+      - homelab
+
+volumes:
+  plane_uploads:
+  plane_rabbitmq_data:
