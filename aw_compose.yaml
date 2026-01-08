@@ -1,0 +1,11 @@
+services:
+  aw-server:
+    build:
+      context: ./aw-server-rust 
+      dockerfile: Dockerfile
+      args:
+        AW_SERVER_RUST_REF: v0.12.0  # commit or tag to pin (set up in Dockerfile)
+    ports:
+      - "5600:5600"
+    volumes:
+      - aw-data:/root/.activitywatch                                                                                                                       │
