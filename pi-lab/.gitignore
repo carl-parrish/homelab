@@ -1,0 +1,19 @@
+# Logs
+logs/
+*.log
+
+# Certificates
+*.crt
+*.key
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Screenshots
+*.png
+
+# Unused cert directory
+caddy_certs/docker-activitywatch/
+
+.git-crypt
