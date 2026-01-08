@@ -10,7 +10,42 @@ The advent of powerful single-board computers like the Raspberry Pi 5 has revolu
 
 Before deploying any services, establishing a solid foundation on the Raspberry Pi 5 is paramount. This involves selecting appropriate hardware, installing a compatible operating system, and configuring the Docker environment correctly. The recommended hardware configuration for a multi-service homelab begins with a Raspberry Pi 5 model equipped with at least 8GB of RAM to comfortably manage multiple concurrent Docker containers. While the device can function with 4GB, the higher memory ceiling provides crucial headroom for memory-intensive applications and database services. For storage, it is strongly advised to use an external Solid State Drive (SSD) connected via a USB 3.0 port as the primary storage for Docker volumes and application data. Relying solely on a microSD card for persistent data is discouraged due to its lower endurance and slower I/O performance, which can create bottlenecks and lead to premature failure under the constant read/write operations of a server. The microSD card should primarily be used to host the operating system itself. A stable power supply, specifically the official 27W (5V/5A) USB-C adapter, is non-negotiable to prevent system instability and data corruption caused by undervoltage, especially when the CPU is under load. Finally, an active cooler or a quality passive cooling case is essential to manage thermals and prevent CPU throttling during sustained workloads.
 
-The choice of operating system is critical for ensuring ARM64 compatibility. The recommended choice is the official **Raspberry Pi OS (64-bit)**, based on Debian Bookworm. A 64-bit OS is a mandatory requirement, as the vast majority of modern Docker images for ARM are built for the `aarch64` (ARM64) architecture. Attempting to run these on a 32-bit OS will result in compatibility errors. Once the OS is installed and the system is updated, the next step is to install Docker Engine and the Docker Compose plugin. This can be accomplished using the official convenience script: `curl -sSL https://get.docker.com | sh`. After installation, it is crucial to add your user to the `docker` group with `sudo usermod -aG docker $USER` to allow management of Docker containers without requiring `sudo` for every command. For network stability, assigning a static IP address to the Raspberry Pi via your router's DHCP reservation settings is a fundamental best practice. This ensures that the services remain accessible at a consistent address on your local network, which is essential for inter-service communication and client access.
+The choice of operating system is critical for ensuring ARM64 compatibility. The recommended choice is the official **Raspberry Pi OS (64-bit)**, based on Debian Bookworm. A 64-bit OS is a mandatory requirement, as the vast majority of modern Docker images for ARM are built for the `aarch64` (ARM64) architecture. Attempting to run these on a 32-bit OS will result in compatibility errors. Once the OS is installed and the system is updated, the next step is to install Docker Engine and the Docker Compose plugin. This can be accomplished using the official convenience script: `curl -sSL https://get.docker.com | sh`. After installation, it is crucial to add your user to the `docker` group with `sudo usermod -aG docker $USER` to allow management of Docker containers without requiring `sudo` for every command. For network stability, assigning a static IP address to the Raspberry Pi via your router's DHCP reservation settings is a fundamental best practice. This ensures that the services remain accessible at a consistent address on your local network, which is essential for inter-service-communication and client access.
+
+## Remote Access and DNS with Tailscale and Caddy
+
+While local network access is a good start, the true power of a homelab is unlocked when services can be accessed securely from anywhere. This guide utilizes Tailscale for secure networking and Caddy as a reverse proxy to manage custom domains and SSL certificates.
+
+### The CNAME-to-Tailscale Pattern
+
+The core strategy, as demonstrated in tutorials by Tailscale, is to use a public CNAME record to point a memorable custom domain (e.g., `service.yourdomain.com`) to a private Tailscale MagicDNS name (e.g., `your-pi.your-tailnet.ts.net`). This makes your service accessible at the custom domain, but only to devices authenticated to your tailnet. Traffic is encrypted end-to-end by Tailscale, and no ports are opened to the public internet.
+
+### Critical DNS Configuration: Global Nameservers
+
+A critical and often overlooked step in this setup is the DNS configuration within the Tailscale admin console. While MagicDNS handles resolution for `.ts.net` addresses, client devices can fail to resolve the initial public CNAME record if they are relying on default or ISP-provided DNS servers.
+
+To ensure reliable resolution across all devices (including those shared with family and friends), a robust public DNS server must be configured as a global nameserver for the tailnet.
+
+1.  Navigate to the **DNS** page in your Tailscale admin console.
+2.  In the **Nameservers** section, click **Add nameserver**.
+3.  Enter a reliable public DNS provider, such as Cloudflare (`1.1.1.1`) or Google (`8.8.8.8`).
+4.  Crucially, enable the **Override local DNS** toggle. This forces all clients on the tailnet to use this resolver for public DNS queries, ensuring they can consistently resolve the CNAME record.
+
+### Troubleshooting Caddy SSL Certificate Issuance
+
+Even with correct DNS, Caddy's automated certificate acquisition via the DNS-01 challenge can sometimes fail for complex reasons. If Caddy's logs show persistent errors like `timed out waiting for record to fully propagate`, it indicates a failure in the Let's Encrypt validation process.
+
+If this occurs, and you have verified your DNS provider API token and permissions are correct, a robust alternative is to issue the certificate manually using a tool like `acme.sh`.
+
+1.  **Install `acme.sh`:** Use `curl https://get.acme.sh | sh` on your server.
+2.  **Set API Credentials:** Export your DNS provider API token (e.g., `export CF_Token="your_token"`).
+3.  **Issue a Wildcard Certificate:** Use `acme.sh` to issue a single certificate for all your domains and their wildcards (e.g., `acme.sh --issue --dns dns_cf -d yourdomain.com -d '*.yourdomain.com'`).
+4.  **Install the Certificate:** Use `acme.sh --install-cert` to copy the certificate files to a secure, non-git-tracked directory on your server (e.g., `/home/user/homelab_certs`).
+5.  **Configure Caddy:** In your `Caddyfile`, create a snippet to reference the manually obtained certificate (`tls /path/to/fullchain.pem /path/to/key.pem`) and `import` this snippet in all your site blocks, removing the DNS provider configuration.
+6.  **Mount the Certificates:** In your `docker-compose.yml`, mount the secure certificate directory into the Caddy container as a read-only volume.
+
+This manual method bypasses Caddy's internal ACME process and provides a stable, long-term solution for certificate management.
+
 
 ## Service Deployment Guides
 
@@ -29,6 +64,12 @@ Jellyfin is a popular open-source media system for managing and streaming movies
 ### Calibre-web: E-Book Library Manager
 
 Calibre-web is a web-based interface for browsing, reading, and downloading e-books stored in a Calibre database. It provides a clean and modern UI for accessing your e-book library from any device. For deployment on a Raspberry Pi, the multi-architecture image from LinuxServer.io (`lscr.io/linuxserver/calibre-web:latest`) is an excellent choice. The setup requires mapping a port for the web UI (e.g., 8083) and defining environment variables for user/group permissions (`PUID`/`PGID`) and your timezone. Two volumes are necessary: one for the application's configuration data and another pointing to the location of your Calibre e-book library.
+
+### Immich: Photo and Video Backup
+
+Immich is a high-performance, self-hosted photo and video backup solution. Its feature set, which includes machine learning for object detection and facial recognition, makes it a powerful private alternative to Google Photos. The official `ghcr.io/immich-app/immich-server` image supports ARM64. However, its initial setup has a critical database dependency that can cause startup failures. Immich requires several PostgreSQL extensions (e.g., `vectors`, `earthdistance`) to be created, but the application's database user lacks the permission to do so by default. This will cause the container to enter a crash loop, with logs showing a `permission denied to create extension` error.
+
+The correct procedure is to temporarily elevate the Immich database user's privileges. After connecting to your PostgreSQL instance as a superuser (e.g., `psql -U admin -d immich`), you must run `ALTER USER immich_user WITH SUPERUSER;`. Allow the Immich container to start up successfully and complete its migrations. Once the container is stable and healthy, it is crucial for security to revoke the privilege by running `ALTER USER immich_user WITH NOSUPERUSER;`. This grant/revoke cycle is only necessary for the initial setup.
 
 ### Kimai: Professional Time Tracking
 
@@ -64,7 +105,9 @@ Convex is an open-source backend platform that provides a reactive database and 
 
 ### Docmost: Collaborative Documentation Wiki
 
-Docmost is a modern, open-source wiki and documentation platform featuring real-time collaboration. Its architecture relies on several components, making Docker Compose the ideal deployment method. The core dependencies include a PostgreSQL database for storing content and a Redis instance for caching and managing real-time events. The official `docmost/docmost` Docker image is expected to be multi-architecture, but if compatibility issues arise on ARM64, building the image from source using Docker Buildx is a viable alternative. The Docker Compose file must define three services: `docmost`, `postgres`, and `redis`. Persistent volumes are required for the PostgreSQL data and Docmost's storage directory. Critical environment variables for the Docmost service include the `APP_URL` (the public-facing URL of the instance), a securely generated `APP_SECRET`, and the connection URLs for the database (`DATABASE_URL`) and Redis (`REDIS_URL`). For real-time collaboration to function correctly, any reverse proxy placed in front of Docmost must be configured to properly handle WebSocket connections.
+Docmost is a modern, open-source wiki and documentation platform featuring real-time collaboration. Its architecture relies on several components, making Docker Compose the ideal deployment method. The core dependencies include a PostgreSQL database for storing content and a Redis instance for caching and managing real-time events. The official `docmost/docmost` Docker image is expected to be multi-architecture, but if compatibility issues arise on ARM64, building the image from source using Docker Buildx is a viable alternative. The Docker Compose file must define three services: `docmost`, `postgres`, and `redis`. Persistent volumes are required for the PostgreSQL data and Docmost's storage directory. 
+
+A critical aspect of a successful deployment is the correct configuration of environment variables. The application will fail to start and enter a restart loop if the following variables are missing or invalid: a securely generated `APP_SECRET` (must be at least 32 characters), the `DATABASE_URL`, and the `REDIS_URL`. The `DATABASE_URL` may also be considered invalid if the password variable is not set correctly in the environment file. For real-time collaboration to function correctly, any reverse proxy placed in front of Docmost must be configured to properly handle WebSocket connections.
 
 ### Plane: Open-Source Project Management
 
@@ -72,7 +115,7 @@ Plane is a comprehensive open-source project management tool, offering an altern
 
 ### NocoDB: No-Code Database Platform
 
-NocoDB transforms existing databases (like MySQL, PostgreSQL, or SQLite) into a smart spreadsheet and no-code application platform, similar to Airtable. A significant consideration for deployment on a Raspberry Pi is that the official `nocodb/nocodb` Docker image **does not support the ARM64 architecture**. This is a critical limitation that requires a workaround. Fortunately, the community has provided a solution with a multi-architecture image available at `azrikahar/nocodb:latest`. This community-maintained image enables NocoDB to run successfully on ARM64 devices. The deployment should be managed via Docker Compose, using this specific image. A persistent volume must be mounted to `/usr/app/data/` inside the container to store the application's metadata and the default SQLite database. For more robust deployments, NocoDB can be configured via environment variables to connect to an external PostgreSQL or MariaDB database container.
+NocoDB transforms existing databases (like MySQL, PostgreSQL, or SQLite) into a smart spreadsheet and no-code application platform, similar to Airtable. While the official `nocodb/nocodb` Docker image supports the ARM64 architecture, the `latest` tag has been found to be unstable in some Raspberry Pi environments, causing the application to fail during startup with configuration parsing errors. To ensure stability, it is highly recommended to use a specific, pinned version tag instead of `latest`. The version `nocodb/nocodb:0.264.9` has been verified to work correctly on this platform. The deployment should be managed via Docker Compose. A persistent volume must be mounted to `/usr/app/data/` inside the container to store the application's metadata and the default SQLite database. For more robust deployments, NocoDB can be configured via environment variables to connect to an external PostgreSQL or MariaDB database container, but care must be taken to use URL-safe passwords in the connection string to avoid parsing errors.
 
 ### Paperless-ngx: Digital Document Management
 

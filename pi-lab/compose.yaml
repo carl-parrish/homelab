@@ -4,9 +4,7 @@ include:
 services:
   # Reverse Proxy
   caddy:
-    image: ghcr.io/caddybuilds/caddy-cloudflare:latest
-    environment:
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+    image: caddy:latest
     container_name: caddy
     restart: unless-stopped
     ports:
@@ -15,12 +13,12 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
+      - /home/cparrish/homelab_certs:/etc/caddy/certs:ro
       - caddy_data:/data
       - caddy_config:/config
       - kimai_app:/opt/kimai:ro
       - phpsock:/var/run/php
-#      - ./pi.cuttlefish-gorgon.ts.net.crt:/etc/caddy/cert.pem:ro
-#      - ./pi.cuttlefish-gorgon.ts.net.key:/etc/caddy/key.pem:ro
+      - ./logs:/var/log/caddy
     networks:
       - homelab
 
@@ -46,6 +44,7 @@ services:
     restart: unless-stopped
     ports:
       - "13378:80"
+#    user: "1000:1000"
     volumes:
       - audiobookshelf_config:/config
       - audiobookshelf_metadata:/metadata
@@ -205,7 +204,9 @@ services:
     restart: unless-stopped
     environment:
       - APP_URL=https://invoices.deeplydigital.net
-      - DATABASE_URL=mysql://kimai:${KIMAI_PASSWORD}@100.85.30.25:3306/kimai
+      - DATABASE_URL=mysql://kimai:${KIMAI_PASSWORD}@100.85.30.25:5432/kimai
+      - ADMINMAIL=${KIMAI_ADMIN_EMAIL}
+      - ADMINPASS=${KIMAI_ADMIN_PASSWORD}
       - APP_ENV=prod
       - TRUSTED_PROXIES=0.0.0.0/0
       - TRUSTED_HOSTS=^invoices\.deeplydigital\.net$
@@ -262,13 +263,19 @@ services:
  #     - homelab
 
   nocodb:
-    image: nocodb/nocodb:latest
+    image: nocodb/nocodb:0.264.9
     container_name: nocodb
     restart: unless-stopped
     ports:
       - "8089:8080"
     environment:
-      - NC_DB=pg://nocodb_user:${NOCODB_PASSWORD}@postgres-local:5432/nocodb
+      #- NC_DB=pg://nocodb_user:${NOCODB_PASSWORD}@postgres-local:5432/nocodb
+      - NC_DB_TYPE=pg
+          - NC_DB_HOST=postgres-local
+          - NC_DB_PORT=5432
+          - NC_DB_USER=nocodb_user
+          - NC_DB_PASSWORD=${NOCODB_PASSWORD}
+          - NC_DB_DATABASE=nocodb
     volumes:
       - nocodb_data:/usr/app/data
     depends_on:
@@ -284,12 +291,41 @@ services:
       - "8065:3000"
     environment:
       - DATABASE_URL=postgres://docmost_user:${DOCMOST_PASSWORD}@postgres-local:5432/docmost
+      - REDIS_URL=${DOCMOST_REDIS_URL}
+      - APP_SECRET=${DOCMOST_APP_SECRET}
     volumes:
       - docmost_data:/var/lib/docmost
     depends_on:
       - init-postgres-local
     networks:
       - homelab
+
+  cognee:
+    image: ghcr.io/topoteretes/cognee-mcp:0.1.0
+    container_name: cognee
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # DB on Mint‑Mini (use MagicDNS)
+      POSTGRES_HOST: mint-mini.cuttlefish-gorgon.ts.net
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: cognee
+      POSTGRES_USER: cognee
+      POSTGRES_PASSWORD: ${COGNEE_DB_PASSWORD}
+      # Optional Redis cache on Mint‑Mini
+      REDIS_URL: redis://mint-mini.cuttlefish-gorgon.ts.net:6379
+      # Models and server
+      LLM_MODEL: openai/gpt-4o-mini
+      EMBEDDING_MODEL: openai/text-embedding-3-small
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DEBUG: "false"
+      LOG_LEVEL: "warning"
+    networks:
+      - homelab
+    depends_on:
+      - caddy
 
 volumes:
   caddy_data:
@@ -315,4 +351,5 @@ volumes:
 
 networks:
   homelab:
-    driver: bridge⏎
+    driver: bridge
+
