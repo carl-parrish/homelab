@@ -15,3 +15,4 @@ Thumbs.db
 
 # Unused cert directory
 caddy_certs/docker-activitywatch/
+.env.bak
