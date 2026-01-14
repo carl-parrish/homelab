@@ -1,0 +1,38 @@
+services:
+  aw-server:
+    container_name: aw-server
+    # 🛠️ The Build Logic
+    # This tells Compose: "Look in the current folder (.), find 'Dockerfile', 
+    # and build an image named 'aw-server-rust:local'"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aw-server-rust:local
+    
+    restart: unless-stopped
+    
+    # 🔓 Ports
+    # 5600 is the API/UI port. 
+    # Since AW has NO AUTH, rely on Tailscale firewalling!
+    ports:
+      - "5600:5600"
+      
+    # 💾 Persistence
+    # Stores the SQLite DB in a volume so it survives updates
+    volumes:
+      - aw_data:/data
+      
+    # ⚙️ Runtime Config
+    # Force it to listen on all interfaces (0.0.0.0) so your network can reach it
+    # and explicitly set the DB path to the volume we mounted.
+    command: ["aw-server", "--host", "0.0.0.0", "--database-file", "/data/aw-server-rust.db"]
+    
+    networks:
+      - homelab
+
+volumes:
+  aw_data:
+
+networks:
+  homelab:
+    external: true
