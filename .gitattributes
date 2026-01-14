@@ -1,0 +1,2 @@
+.env filter=git-crypt diff=git-crypt
+.env.infra filter=git-crypt diff=git-crypt

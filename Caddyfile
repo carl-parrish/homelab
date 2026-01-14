@@ -58,7 +58,6 @@ vault.carlparrish.com {
                 import manual-tls
         reverse_proxy vaultwarden:80 {
                 import handle-proxy
-                header_up X-Forwarded-Prefix /vault
         }
 }
 
@@ -67,14 +66,14 @@ budget.carlparrish.com {
                 import manual-tls
         reverse_proxy actual-budget:5006 {
                 import handle-proxy
-                header_up X-Forwarded-Prefix /budget
         }
 }
 
   #--- Activity Watch ---
 aw.sourcecodesamurai.com {
                 import manual-tls
-    reverse_proxy activitywatch:5600
+    reverse_proxy /api/* activitywatch:5600
+    reverse_proxy aw-webui:80
 }
 
 docs.sourcecodesamurai.com {
@@ -98,7 +97,6 @@ funds.deeplydigital.net {
                 import manual-tls
         reverse_proxy firefly:8080 {
                 import handle-proxy
-                header_up X-Forwarded-Prefix /firefly
         }
 }
 
@@ -116,6 +114,19 @@ invoices.deeplydigital.net {
                 root * /opt/kimai/public
                 php_fastcgi unix//var/run/php/php-fpm.sock
                 file_server
+}
+
+    #--- Cognee --
+http://cognee.cuttlefish-gorgon.ts.net {
+
+    # Forward traffic to the cognee-mcp container
+    reverse_proxy cognee-mcp:8000
+
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "POST, GET, OPTIONS"
+        Access-Control-Allow-Headers *
+    }
 }
 
 

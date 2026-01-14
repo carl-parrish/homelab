@@ -1,0 +1,50 @@
+services:
+  # ---------------------------------------------------------------------------
+  # INIT: External Connectivity Check
+  # ---------------------------------------------------------------------------
+  # This container blocks Infisical from starting until mint-mini is reachable.
+  init-check-db:
+    image: alpine:latest
+    container_name: init-check-db
+    command: >
+      sh -c "apk add --no-cache netcat-openbsd &&
+      echo 'Waiting for Postgres on mint-mini...' &&
+      until nc -z -v -w5 mint-mini.cuttlefish-gorgon.ts.net 5432; do
+        echo 'Database is unavailable - sleeping';
+        sleep 5;
+      done;
+      echo 'Database is UP! Starting Infisical...'"
+    networks:
+      - homelab
+
+  # ---------------------------------------------------------------------------
+  # LAYER 1: Secrets Engine
+  # ---------------------------------------------------------------------------
+  infisical:
+    image: infisical/infisical:latest-postgres
+    container_name: infisical
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    env_file: .env.infra
+    environment:
+      - ENCRYPTION_KEY=${INFISICAL_ENCRYPTION_KEY}
+      - AUTH_SECRET=${INFISICAL_AUTH_SECRET}
+      - DB_CONNECTION_URI=postgresql://infisical_user:${INFISICAL_PASSWORD}@mint-mini.cuttlefish-gorgon.ts.net/infisical
+      - REDIS_URL=redis://mint-mini.cuttlefish-gorgon.ts.net:6379
+      - SITE_URL=secrets.cuttlefish-gorgon.ts.net
+      - IN_APP_SIGNUP_ENABLED=false
+    networks:
+      - homelab
+    depends_on:
+      init-check-db:
+        condition: service_completed_successfully
+
+# ---------------------------------------------------------------------------
+# NETWORK OWNER
+# ---------------------------------------------------------------------------
+networks:
+  homelab:
+    name: homelab
+    driver: bridge
+    attachable: true
