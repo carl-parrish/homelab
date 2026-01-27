@@ -33,12 +33,13 @@ services:
       - DB_CONNECTION_URI=postgresql://infisical_user:${INFISICAL_PASSWORD}@mint-mini.cuttlefish-gorgon.ts.net/infisical
       - REDIS_URL=redis://mint-mini.cuttlefish-gorgon.ts.net:6379
       - SITE_URL=secrets.cuttlefish-gorgon.ts.net
-      - IN_APP_SIGNUP_ENABLED=false
+      - IN_APP_SIGNUP_ENABLED=true
     networks:
       - homelab
     depends_on:
       init-check-db:
         condition: service_completed_successfully
+
 
 # ---------------------------------------------------------------------------
 # NETWORK OWNER

@@ -90,7 +90,7 @@ services:
       - homelab
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.4.6
     container_name: n8n
     restart: unless-stopped
     ports:
@@ -106,6 +106,33 @@ services:
       - DB_POSTGRESDB_PASSWORD=${N8N_PASSWORD}
     networks:
       - homelab
+
+    
+  n8n-mcp:
+    image: ghcr.io/czlonkowski/n8n-mcp:latest
+    container_name: n8n-mcp
+    restart: unless-stopped
+    environment:
+      # MCP server mode
+      MCP_MODE: sse
+
+      # n8n connection (internal Docker network)
+      N8N_API_URL: https://n8n.sourcecodesamurai.com
+      N8N_API_KEY: ${N8N_API_KEY}
+
+      # Auth token for MCP clients (agents)
+      AUTH_TOKEN: ${N8N_MCP_AUTH_TOKEN}
+
+      # Logging
+      LOG_LEVEL: info
+
+    command: ["n8n-mcp", "serve", "--mode", "sse", "--port", "3000"]
+    depends_on:
+      - n8n
+
+    networks:
+      - homelab
+
 
   vaultwarden:
     image: vaultwarden/server:latest
@@ -270,18 +297,6 @@ services:
       envsubst '${PLANE_PASSWORD} ${NOCODB_PASSWORD} ${DOCMOST_PASSWORD}' < /app/postgres-init-local.sql \
       | docker exec -i postgres-local psql -U admin"
 
-  #plane:
-  #  image: makeplane/plane:latest
-  #  container_name: plane
-  #  restart: unless-stopped
-  #  ports:
-  #    - "127.0.0.1:8090:8000"
-  #  environment:
-  #    - DATABASE_URL=postgres://plane_user:${PLANE_PASSWORD}@postgres-local:5432/plane
- #  depends_on:
- #     - init-postgres-local
- #   networks:
- #     - homelab
 
   nocodb:
     image: nocodb/nocodb:0.264.9
@@ -290,17 +305,18 @@ services:
     ports:
       - "8089:8080"
     environment:
-      #- NC_DB=pg://nocodb_user:${NOCODB_PASSWORD}@postgres-local:5432/nocodb
-      - NC_DB_TYPE=pg
-          - NC_DB_HOST=postgres-local
-          - NC_DB_PORT=5432
-          - NC_DB_USER=nocodb_user
-          - NC_DB_PASSWORD=${NOCODB_PASSWORD}
-          - NC_DB_DATABASE=nocodb
+      - NC_DB=pg://postgres-local:5432?u=nocodb_user&p=${NOCODB_PASSWORD}&d=nocodb
+      #- NC_DB_TYPE=pg
+      #- NC_DB_HOST=postgres-local
+      #- NC_DB_PORT=5432
+      #- NC_DB_USER=nocodb_user
+      #- NC_DB_PASSWORD=${NOCODB_PASSWORD}
+      #- NC_DB_DATABASE=nocodb
     volumes:
       - nocodb_data:/usr/app/data
     depends_on:
-      - init-postgres-local
+      init-postgres-local:
+        condition: service_completed_successfully
     networks:
       - homelab
 
@@ -395,31 +411,6 @@ services:
       - homelab
     depends_on:
       - cognee-backend
-
-# ---------------------------------------------------------------------------
-  # INFISICAL (Secrets Management)
-  # ---------------------------------------------------------------------------
-#  infisical:
-#    image: infisical/infisical:latest-postgres
-#    container_name: infisical
-#    restart: unless-stopped
-#    ports:
-#      - "8081:8080"
-#    environment:
-#      # --- SECRETS (Generate these via openssl) ---
-#      - ENCRYPTION_KEY=${INFISICAL_ENCRYPTION_KEY}
-#      - AUTH_SECRET=${INFISICAL_AUTH_SECRET}
-#
-#      # --- EXTERNAL RESOURCES (Mint-Mini) ---
-#      # You must create this DB and User on mint-mini manually first!
-#      - DB_CONNECTION_URI=postgresql://infisical_user:${INFISICAL_PASSWORD}@mint-mini.cuttlefish-gorgon.ts.net/infisical
-#      - REDIS_URL=redis://mint-mini.cuttlefish-gorgon.ts.net:6379
-#
-#      # --- CONFIG ---
-#      - SITE_URL=secrets.cuttlefish-gorgon.ts.net
-#      - IN_APP_SIGNUP_ENABLED=true
-#    networks:
-#      - homelab
 
 
 volumes:
