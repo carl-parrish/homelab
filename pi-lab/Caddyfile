@@ -2,6 +2,15 @@
         header_up X-Forwarded-Proto https
 }
 
+(cors) {
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers *
+        Access-Control-Max-Age "3600"
+    }
+}
+
 (manual-tls) {
 #    tls {
 #        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
@@ -72,7 +81,10 @@ budget.carlparrish.com {
   #--- Activity Watch ---
 aw.sourcecodesamurai.com {
                 import manual-tls
-    reverse_proxy /api/* activitywatch:5600
+                import cors
+    reverse_proxy /api/* activitywatch:5600 {
+    header_up -Origin
+    }
     reverse_proxy aw-webui:80
 }
 
@@ -89,6 +101,13 @@ noco.sourcecodesamurai.com {
 n8n.sourcecodesamurai.com {
                 import manual-tls
   reverse_proxy n8n:5678
+}
+
+#--- n8n MCP --
+n8n-mcp.sourcecodesamurai.com {
+    import manual-tls
+    reverse_proxy n8n-mcp:3000
+    import cors
 }
 
 
@@ -121,12 +140,13 @@ http://cognee.cuttlefish-gorgon.ts.net {
 
     # Forward traffic to the cognee-mcp container
     reverse_proxy cognee-mcp:8000
+    import cors
 
-    header {
-        Access-Control-Allow-Origin *
-        Access-Control-Allow-Methods "POST, GET, OPTIONS"
-        Access-Control-Allow-Headers *
-    }
+    # header {
+    #     Access-Control-Allow-Origin *
+    #     Access-Control-Allow-Methods "POST, GET, OPTIONS"
+    #     Access-Control-Allow-Headers *
+    # }
 }
 
 
