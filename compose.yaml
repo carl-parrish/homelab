@@ -70,11 +70,9 @@ services:
 
   # Immich (central Postgres + Redis on mint-mini)
   immich:
-    image: ghcr.io/immich-app/immich-server:release
+    image: ghcr.io/immich-app/immich-server:v2.5.2
     container_name: immich
     restart: unless-stopped
-    ports:
-      - "2283:2283"
     volumes:
       - immich_upload:/usr/src/app/upload
       - /mnt/nas/Pictures:/usr/src/app/external:ro
@@ -91,7 +89,7 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:release
+    image: ghcr.io/immich-app/immich-machine-learning:v2.5.2
     volumes:
       - model-cache:/cache
     environment:
