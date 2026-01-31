@@ -89,6 +89,17 @@ services:
     networks:
       - homelab
 
+  immich-machine-learning:
+    container_name: immich_machine_learning
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    volumes:
+      - model-cache:/cache
+    environment:
+      - REDIS_HOSTNAME=100.85.30.25
+    restart: unless-stopped
+    networks:
+      - homelab
+
   n8n:
     image: n8nio/n8n:2.4.6
     container_name: n8n
@@ -222,11 +233,13 @@ services:
       - ROOT_URL=https://git.deeplydigital.net/
       - SSH_DOMAIN=git.deeplydigital.net
       - SSH_PORT=2222 # external port users will connect to
+      - GITEA__SERVER__DISABLE_SSH=false
+      - GITEA__SERVER__SSH_PORT=2222        # what users see in clone URLs
+      - GITEA__SERVER__SSH_LISTEN_PORT=22   # where it actually listens inside container
     volumes:
       - /mnt/nas/repo:/data # store repos on NAS
     ports:
-      - "3000:3000" # web UI (proxied via Caddy)
-      - "2222:22" # SSH git access
+      - "100.78.208.63:2222:22" # SSH git access
     networks:
       - homelab
 
@@ -267,6 +280,25 @@ services:
     networks:
       - homelab
 
+
+  sentinel:
+    image: git.deeplydigital.net/cparrish/agentgateway:latest
+    container_name: sentinel  # <-- Internal nickname
+    restart: unless-stopped
+    environment:
+      - AGENTGATEWAY_CONFIG=/etc/sentinel/config.yaml
+    volumes:
+      - ./sentinel/config.yaml:/etc/sentinel/config.yaml:ro
+    networks:
+      - homelab
+    # This appends to the Entrypoint: /app/agentgateway -f /etc/sentinel/config.yaml
+    command: ["-f", "/etc/sentinel/config.yaml"]
+    expose:
+      - "8080"
+    # This makes it accessible via Caddy
+    labels:
+      caddy: sentinel.sourcecodesamurai.com
+      caddy.reverse_proxy: "{{upstreams 8080}}"
 
 
   # ---------------- Local DB for Plane / NocoDB / Docmost ----------------
@@ -330,7 +362,7 @@ services:
       - DATABASE_URL=postgres://docmost_user:${DOCMOST_PASSWORD}@postgres-local:5432/docmost
       - REDIS_URL=${DOCMOST_REDIS_URL}
       - APP_SECRET=${DOCMOST_APP_SECRET}
-            - APP_URL=https://docs.sourcecodesamurai.com
+      - APP_URL=https://docs.sourcecodesamurai.com
     volumes:
       - docmost_data:/var/lib/docmost
     depends_on:
@@ -412,6 +444,39 @@ services:
     depends_on:
       - cognee-backend
 
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - 5001:5001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/nas/vol/dockge/pi:/app/data
+      # Map your current directory (where compose.yaml is) so Dockge can see it
+      - ./:/opt/stacks/homelab 
+    environment:
+      - DOCKGE_STACKS_DIR=/opt/stacks
+    networks:
+      - homelab
+
+  teleport:
+    image: public.ecr.aws/gravitational/teleport-distroless:16
+    container_name: teleport
+    restart: unless-stopped
+    network_mode: host 
+    volumes:
+      - ./teleport-data:/var/lib/teleport
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TELEPORT_ROLES=node
+      # Connect to the mint-mini Auth server via Tailscale (using default port 3080)
+      - TELEPORT_PROXY=mint-mini.cuttlefish-gorgon.ts.net:3080
+      # Pulled from Infisical (Environment Variable)
+      # You get this token by running `docker exec teleport tctl tokens add --type=node` on mint-mini
+      - TELEPORT_TOKEN=${TELEPORT_TOKEN}
+      # Since we are using self-signed certs initially, we may need insecure mode for the agent
+      - TELEPORT_INSECURE_SKIP_VERIFY=true
 
 volumes:
   caddy_data:
@@ -437,6 +502,7 @@ volumes:
   cognee_data:
   cognee_mcp_data:
   forgejo-runner-data:
+  model-cache:
 
 
 networks:
