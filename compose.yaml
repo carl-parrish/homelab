@@ -42,6 +42,17 @@ services:
     networks:
       - homelab
   
+  rustical:
+    image: ghcr.io/lennart-k/rustical:0.9.12
+    container_name: rustical
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - rustical_data:/var/lib/rustical/
+    networks:
+      - homelab
+
       # --- CONVEX STACK ---
   convex-backend:
     # Using the official image name and a specific SHA pin for stability
@@ -123,6 +134,7 @@ volumes:
   postgres_data:
   mariadb_data:
   convex_data:
+  rustical_data:
 
 networks:
   homelab:
