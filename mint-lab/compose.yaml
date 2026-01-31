@@ -1,13 +1,15 @@
-# This file defines the database services and x86_64-specific applications
-# running on the Mac Mini. Convex has been added.
+
 services:
   postgres:
-    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    build: ./postgres-custom       # <--- Build our local image
+    image: custom-postgres:latest  # <--- Tag it
+    #image: tensorchord/pgvecto-rs:pg14-v0.2.0
     container_name: postgres-main
     restart: unless-stopped
     environment:
       POSTGRES_USER: 'admin'
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: "postgres -c wal_level=logical -c shared_preload_libraries=vectors.so"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -62,18 +64,13 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      # Port for the backend API
       - "127.0.0.1:8091:3210"
     volumes:
-      # Using the path from the official example
       - convex_data:/convex/data
     environment:
-      # Tells Convex where its own public-facing API is
       CONVEX_CLOUD_ORIGIN: 'http://localhost:8091'
-      # Tells Convex what database to use
       POSTGRES_URL: ${CONVEX_POSTGRES_URL}
       DO_NOT_REQUIRE_SSL: 'true'
-      # Disables anonymous telemetry
       DISABLE_BEACON: 'true'
     networks:
       - homelab
@@ -83,33 +80,29 @@ services:
       init-postgres:
         condition: service_completed_successfully
     healthcheck:
-      # Docker will check this URL to see if the service is healthy
       test: curl -f http://localhost:3210/version
       interval: 5s
       start_period: 10s
 
   convex-dashboard:
-    # The web UI for managing Convex
     image: ghcr.io/get-convex/convex-dashboard:33cef775a8a6228cbacee4a09ac2c4073d62ed13
     container_name: convex-dashboard
     restart: unless-stopped
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      # Port for you to access the dashboard in your browser
       - "127.0.0.1:6791:6791"
     environment:
-      # Tells the dashboard where to find the backend API
       NEXT_PUBLIC_DEPLOYMENT_URL: 'http://localhost:8091'
     networks:
       - homelab
     depends_on:
-      # This is crucial: it waits for the backend to be healthy before starting
       convex-backend:
         condition: service_healthy
   init-postgres:
     image: alpine:latest
-    env_file: .env
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,7 +113,8 @@ services:
     command: sh -c "apk add --no-cache fish gettext docker-cli && fish init-dbs.fish postgres"
   init-mariadb:
     image: alpine:latest
-    env_file: .env
+    env_file:
+      - .env
     depends_on:
       mariadb:
         condition: service_started
@@ -130,11 +124,69 @@ services:
     working_dir: /app
     command: sh -c "apk add --no-cache fish gettext docker-cli && fish init-dbs.fish mariadb"
 
+  kopia:
+    image: kopia/kopia:latest
+    container_name: kopia-server
+    restart: unless-stopped
+    ports:
+      - "51515:51515"
+    networks:
+      - homelab
+    volumes:
+      - kopia_repo_data:/repository
+      - kopia_config:/app/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      KOPIA_PASSWORD: ${KOPIA_PASSWORD}
+    command: >
+      server start
+      --address=0.0.0.0:51515
+      --without-password
+      --insecure
+      --config-file=/app/config/repository.config
+
+  teleport:
+    image: public.ecr.aws/gravitational/teleport-distroless:16
+    container_name: teleport
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./teleport-data:/var/lib/teleport  # <--- Local directory
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./teleport.yaml:/etc/teleport/teleport.yaml
+    environment:
+      # No Roles needed if using config file, but strictly:
+      # We rely on the mounted config for full control
+      - TELEPORT_CONFIG_FILE=/etc/teleport/teleport.yaml
+
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - 5001:5001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /mnt/nas/vol/dockge/mint:/app/data
+      # Map your current directory (where compose.yaml is) so Dockge can see it
+      - ./:/opt/stacks/homelab 
+    environment:
+      - DOCKGE_STACKS_DIR=/opt/stacks
+    networks:
+      - homelab
+
 volumes:
   postgres_data:
   mariadb_data:
   convex_data:
   rustical_data:
+  kopia_repo_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/nas/backup/kopia-repo
+  kopia_config:
 
 networks:
   homelab:
