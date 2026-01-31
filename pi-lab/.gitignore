@@ -18,3 +18,4 @@ caddy_certs/docker-activitywatch/
 
 .git-crypt
 .env.bak
+.env.infra
