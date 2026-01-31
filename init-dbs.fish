@@ -8,7 +8,7 @@ switch "$argv[1]"
 
         # Run SQL after envsubst
         set tmpfile (mktemp)
-        envsubst '${CONVEX_PASSWORD} ${VW_PASSWORD} ${AB_PASSWORD} ${IMMICH_PASSWORD} ${N8N_PASSWORD} ${FIREFLY_PASSWORD} ${FORGEJO_PASSWORD}' \
+        envsubst '${CONVEX_PASSWORD} ${VW_PASSWORD} ${AB_PASSWORD} ${IMMICH_PASSWORD} ${N8N_PASSWORD} ${FIREFLY_PASSWORD} ${FORGEJO_PASSWORD} ${INFISICAL_PASSWORD} ${COGNEE_DB_PASSWORD} ${TELEPORT_DB_PASSWORD}' \
           < postgres-init/init-databases.sql > $tmpfile
 
         # Use -f - to ensure psql reads from stdin, allowing for the SQL to be piped
