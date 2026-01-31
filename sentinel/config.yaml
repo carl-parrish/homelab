@@ -1,0 +1,28 @@
+binds:
+  - port: 8080
+    listeners:
+      - routes:
+          - backends:
+              - mcp:
+                  targets:
+                    - name: cognee
+                      mcp:
+                        host:https://cognee.cuttlefish-gorgon.ts.net/mcp
+                    - name: n8n
+                      mcp:
+                        host: http://n8n-mcp:3000
+            policies:
+              cors:
+                allowOrigins:
+                  - "*"
+                allowHeaders:
+                  - mcp-protocol-version
+                  - content-type
+                  - cache-control
+                  - authorization
+                  - mcp-session-id
+                exposeHeaders:
+                  - Mcp-Session-Id
+
+              backendAuth:
+                key: "Bearer ecc4b811f4827c42b07aae4dd2d1d5fc9ff3d351d461c831bd87f690407f7276"

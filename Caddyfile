@@ -110,6 +110,12 @@ n8n-mcp.sourcecodesamurai.com {
     import cors
 }
 
+#--- Sentinel ---
+sentinel.sourcecodesamurai.com {
+    import manual-tls
+    import cors
+    reverse_proxy sentinel:8080
+}
 
                 # --- Firefly ---
 funds.deeplydigital.net {
