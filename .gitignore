@@ -17,3 +17,4 @@ Thumbs.db
 caddy_certs/docker-activitywatch/
 .env.bak
 .env.infra
+sentinel/config.yaml

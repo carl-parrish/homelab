@@ -25,4 +25,4 @@ binds:
                   - Mcp-Session-Id
 
               backendAuth:
-                key: "Bearer ecc4b811f4827c42b07aae4dd2d1d5fc9ff3d351d461c831bd87f690407f7276"
+                key: "Bearer ${N8N_MCP_AUTH_TOKEN}"

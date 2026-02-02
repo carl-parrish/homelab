@@ -147,8 +147,6 @@ services:
     image: vaultwarden/server:latest
     container_name: vaultwarden
     restart: unless-stopped
-    ports:
-      - "8082:80"
     volumes:
       - vaultwarden_data:/data
     environment:
@@ -332,8 +330,6 @@ services:
     image: nocodb/nocodb:0.264.9
     container_name: nocodb
     restart: unless-stopped
-    ports:
-      - "8089:8080"
     environment:
       - NC_DB=pg://postgres-local:5432?u=nocodb_user&p=${NOCODB_PASSWORD}&d=nocodb
       #- NC_DB_TYPE=pg
