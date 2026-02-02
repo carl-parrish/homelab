@@ -1,3 +1,9 @@
 [tools]
 age = "latest"
 sops = "latest"
+
+"ubi:a8m/envsubst" = "latest"
+
+[tasks.gen-sentinel]
+description = "Generate sentinel/config.yaml from template using Infisical secrets"
+run = "infisical run -- sh -c 'envsubst < sentinel/config.yaml.template > sentinel/config.yaml'"
