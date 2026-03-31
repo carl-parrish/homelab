@@ -8,4 +8,4 @@ This project matures a Solar-Aware Sovereign Software Architecture designed to l
 
 [My Blog Post](https://carlparrish.com)
 
-![Network-topology](docs/network-topology.png)
+![Network-topology](docs/network-topology.png "Network-topology")
