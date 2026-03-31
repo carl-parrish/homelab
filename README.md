@@ -9,3 +9,17 @@ This project matures a Solar-Aware Sovereign Software Architecture designed to l
 [My Blog Post](https://carlparrish.com)
 
 ![Network-topology](docs/network-topology.png "Network-topology")
+
+
+🤝 How to Contribute
+"We are building a Sovereign Common, and your input is vital. We welcome contributions in the following areas:
+
+Solar Profiles: Help us define KEDA scaling triggers for different battery chemistries (LiFePO4, Na-ion).
+
+Local AI Hardening: Contribute to our validation pipelines for ensuring local LLM deterministic outputs.
+
+Infrastructure Patterns: Share your Talos Linux or K3s configurations for specific edge-hardware clusters.
+
+Please see CONTRIBUTING.md for our code of conduct and pull request process. Let’s build an intentional, decentralized future together."
+
+
