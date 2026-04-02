@@ -14,7 +14,7 @@ This project matures a Solar-Aware Sovereign Software Architecture designed to l
 🤝 How to Contribute
 "We are building a Sovereign Common, and your input is vital. We welcome contributions in the following areas:
 
-Solar Profiles: Help us define KEDA scaling triggers for different battery chemistries (LiFePO4, Na-ion).
+Solar Profiles: Help us define KEDA scaling triggers for different battery chemistries (LiFePO4, Na-ion, Iron Flow, etc...).
 
 Local AI Hardening: Contribute to our validation pipelines for ensuring local LLM deterministic outputs.
 
