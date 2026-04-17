@@ -20,3 +20,4 @@ caddy_certs/docker-activitywatch/
 .env.bak
 .env.infra
 sentinel/config.yaml
+.mise.toml
