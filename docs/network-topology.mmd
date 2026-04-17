@@ -1,0 +1,38 @@
+graph TB
+    subgraph "Remote Locations"
+        A[Sovereign Unit<br/>Home Lab]
+        B[Sovereign Unit<br/>Maritime/Vessel]
+        C[Sovereign Unit<br/>Remote Office]
+    end
+    
+    subgraph "Tailscale Mesh Overlay"
+        D[Encrypted WireGuard Tunnels]
+    end
+    
+    subgraph "Local Connectivity (Single Unit)"
+        E[User Devices<br/>Laptop/Phone]
+        F[Wi-Fi HaLow<br/>MM8108<br/>Long-Range/Low-Power]
+        G[Standard Wi-Fi<br/>Local Access]
+        H[10GbE Backplane<br/>SFP+ Switch]
+        I[CM5 Cluster]
+        J[Framework Desktop]
+        K[LincStation N2 NAS]
+    end
+    
+    A --> D
+    B --> D
+    C --> D
+    D -.->|Secure Mesh| E
+    
+    E -->|HaLow| F
+    E -->|Wi-Fi| G
+    F --> I
+    G --> I
+    H --> J
+    H --> K
+    I --> H
+    J --> H
+    
+    style D fill:#f0e1ff
+    style F fill:#e1ffe1
+    style H fill:#fff4e1
