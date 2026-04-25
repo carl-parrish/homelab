@@ -1,2 +1,2 @@
-# Age encryption
-# .env filter=git-crypt diff=git-crypt
+# No encryption
+# Keep .env unencrypted for template - actual values in 1Password
