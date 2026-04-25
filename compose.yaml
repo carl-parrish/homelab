@@ -39,6 +39,9 @@ services:
     image: redis:6.2-alpine
     container_name: redis-main
     restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
     ports:
       - "6379:6379"
     networks:
@@ -55,6 +58,37 @@ services:
     networks:
       - homelab
 
+  surrealdb:
+    image: surrealdb/surrealdb:v3.0.5
+    container_name: surrealdb-main
+    restart: unless-stopped
+    user: "1000:1000"
+    ports:
+      - "127.0.0.1:8000:8000" # Target for Tailscale Service
+    environment:
+      SURREALDB_USER: ${SURREALDB_USER}
+      SURREALDB_PASSWORD: ${SURREALDB_PASSWORD}
+    volumes:
+      - /opt/homelab/data/surreal:/data
+    command:
+      - start
+      - --bind
+      - 0.0.0.0:8000
+      - --user
+      - ${SURREALDB_USER}
+      - --pass
+      - ${SURREALDB_PASSWORD}
+      - --ns
+      - main           # Explicitly set the namespace
+      - --db
+      - homestead
+      - surrealkv://data/surreal.db # Forces local NVMe persistence
+    networks:
+      - homelab
+    depends_on:
+      - garage # We still depend on garage, even if not for storage, it's a core service
+      
+     
       # --- CONVEX STACK ---
   convex-backend:
     # Using the official image name and a specific SHA pin for stability
@@ -124,6 +158,25 @@ services:
     working_dir: /app
     command: sh -c "apk add --no-cache fish gettext docker-cli && fish init-dbs.fish mariadb"
 
+  garage:
+    image: dxflrs/garage:v2.2.0
+    container_name: garage
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "127.0.0.1:3900:3900" # S3 API bound to loopback for Tailscale
+      - "127.0.0.1:3902:3902" # S3 Web
+      - "127.0.0.1:3903:3903" # Admin API
+      - "3901:3901"           # RPC (Keep open for future clustering)
+    volumes:
+      - /var/lib/garage/meta:/var/lib/garage/meta
+      - /mnt/nas/S3/config:/var/lib/garage/data
+      - /etc/garage.toml:/etc/garage.toml:ro
+    environment:
+      - GARAGE_RPC_SECRET=${GARAGE_RPC_SECRET}
+
+
   kopia:
     image: kopia/kopia:latest
     container_name: kopia-server
@@ -133,17 +186,34 @@ services:
     networks:
       - homelab
     volumes:
-      - kopia_repo_data:/repository
-      - kopia_config:/app/config
+      - ./config/kopia:/app/config
       - /etc/localtime:/etc/localtime:ro
     environment:
       KOPIA_PASSWORD: ${KOPIA_PASSWORD}
-    command: >
-      server start
-      --address=0.0.0.0:51515
-      --without-password
-      --insecure
-      --config-file=/app/config/repository.config
+      KOPIA_SERVER_PASSWORD: ${KOPIA_SERVER_PASSWORD}
+      GARAGE_KEY_ID: ${GARAGE_KEY_ID}
+      GARAGE_SECRET_KEY: ${GARAGE_SECRET_KEY}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+          if [ ! -f /app/config/repository.config ]; then
+            kopia repository connect s3 \
+              --bucket=kopia-backups \
+              --endpoint=s3.cuttlefish-gorgon.ts.net \
+              --access-key=$GARAGE_KEY_ID \
+              --secret-access-key=$GARAGE_SECRET_KEY \
+              --region=garage \
+              --config-file=/app/config/repository.config;
+          fi &&
+          exec kopia server start \
+            --address=0.0.0.0:51515 \
+            --server-username=cparrish \
+            --server-control-password=$KOPIA_SERVER_PASSWORD \
+            --config-file=/app/config/repository.config \
+            --tls-cert-file=/app/config/server.crt \
+            --tls-key-file=/app/config/server.key \
+            --disable-csrf-token-checks
 
   teleport:
     image: public.ecr.aws/gravitational/teleport-distroless:16
@@ -159,34 +229,64 @@ services:
       # We rely on the mounted config for full control
       - TELEPORT_CONFIG_FILE=/etc/teleport/teleport.yaml
 
-  dockge:
-    image: louislam/dockge:1
-    container_name: dockge
-    restart: unless-stopped
-    ports:
-      - 5001:5001
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /mnt/nas/vol/dockge/mint:/app/data
-      # Map your current directory (where compose.yaml is) so Dockge can see it
-      - ./:/opt/stacks/homelab 
-    environment:
-      - DOCKGE_STACKS_DIR=/opt/stacks
-    networks:
-      - homelab
+#  dockge:
+#    image: louislam/dockge:1
+#    container_name: dockge
+#    restart: unless-stopped
+#    ports:
+#      - 5001:5001
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - /mnt/nas/vol/dockge/mint:/app/data
+#      # Map your current directory (where compose.yaml is) so Dockge can see it
+#      - ./:/opt/stacks/homelab 
+#    environment:
+#      - DOCKGE_STACKS_DIR=/opt/stacks
+#    networks:
+#      - homelab
+#
+
+#  languagetool:
+#    image: meyayl/languagetool:6.6-7
+#    container_name: languagetool
+#    restart: unless-stopped
+#    volumes:
+#      - languagetool_ngrams:/ngrams
+#    networks:
+#      - homelab
 
 volumes:
+  redis_data:
   postgres_data:
   mariadb_data:
   convex_data:
   rustical_data:
+#  languagetool_ngrams:
   kopia_repo_data:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: /mnt/nas/backup/kopia-repo
-  kopia_config:
+  garage_meta:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/garage/meta # Local NVMe
+  garage_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/nas/S3/data     # Bulk Storage (Fixed path)     
+  surrealdb_meta:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/surrealdb/meta # Local NVMe for query speed
+
 
 networks:
   homelab:
