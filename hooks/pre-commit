@@ -1,0 +1,13 @@
+#!/bin/bash
+# Prevent committing unencrypted .env
+
+if git diff --cached --name-only | grep -q "^.env$"; then
+    if grep -q "^sops:" .env 2>/dev/null; then
+        exit 0
+    elif grep -q "^[^#]*^[A-Z_]*=" .env 2>/dev/null | grep -qv "ENC\["; then
+        echo "ERROR: .env contains unencrypted secrets!"
+        echo "Use 'sops edit .env' to encrypt before committing"
+        exit 1
+    fi
+fi
+exit 0
