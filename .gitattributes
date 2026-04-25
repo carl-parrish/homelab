@@ -1,2 +1,2 @@
-# Age encryption replaced git-crypt
+# Age encryption
 # .env filter=git-crypt diff=git-crypt
