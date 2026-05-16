@@ -200,4 +200,4 @@ http://cognee.cuttlefish-gorgon.ts.net {
 pi.cuttlefish-gorgon.ts.net {
     tls internal
     reverse_proxy jellyfin:8096
-
+}

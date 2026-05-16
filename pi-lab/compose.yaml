@@ -1,6 +1,3 @@
-include:
-  - plane.yaml
-
 services:
   # Reverse Proxy
   caddy:
@@ -75,7 +72,7 @@ services:
     container_name: immich
     restart: unless-stopped
     volumes:
-      - immich_upload:/usr/src/app/upload
+      - /mnt/nas/Pictures/immich_upload:/usr/src/app/upload
       - /mnt/nas/Pictures:/usr/src/app/external:ro
     environment:
       - DB_HOSTNAME=pgsql.cuttlefish-gorgon.ts.net
@@ -146,11 +143,8 @@ services:
 
       # Logging
       LOG_LEVEL: info
-
-    command: ["n8n-mcp", "serve", "--mode", "sse", "--port", "3000"]
     depends_on:
       - n8n
-
     networks:
       - homelab
 
@@ -174,6 +168,32 @@ services:
     ports:
         - "5678:5678"
     restart: unless-stopped
+    networks:
+      - homelab
+
+  nats:
+    image: nats:latest
+    container_name: nats-server
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+
+    restart: unless-stopped
+    
+  forgejo-mcp:
+    image: git.deeplydigital.net/cparrish/forgejo-mcp:latest
+    container_name: forgejo-mcp
+    environment:
+      - FORGEJO_URL=https://git.deeplydigital.net
+      - FORGEJO_TOKEN=${FORGEJO_AGENT_PAT}
+      - FORGEJO_USERNAME=cparrish
+    env_file:
+      - .env.infra
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
     networks:
       - homelab
 
@@ -268,6 +288,22 @@ services:
       - FORGEJO__server__START_SSH_SERVER=true
       - FORGEJO__server__SSH_LISTEN_PORT=22
       - FORGEJO__server__BUILTIN_SSH_SERVER_USER=git
+        # --- Garage: LFS ---
+      - FORGEJO__lfs__STORAGE_TYPE=minio
+      - FORGEJO__lfs__MINIO_ENDPOINT=s3.cuttlefish-gorgon.ts.net:3900
+      - FORGEJO__lfs__MINIO_ACCESS_KEY_ID=${GARAGE_KEY_ID}
+      - FORGEJO__lfs__MINIO_SECRET_ACCESS_KEY=${GARAGE_SECRET_KEY}
+      - FORGEJO__lfs__MINIO_BUCKET=forgejo-lfs
+      - FORGEJO__lfs__MINIO_USE_SSL=false
+      - FORGEJO__lfs__MINIO_FORCE_PATH_STYLE=true
+        # --- Garage: Packages ---
+      - FORGEJO__packages__STORAGE_TYPE=minio
+      - FORGEJO__packages__MINIO_ENDPOINT=s3.cuttlefish-gorgon.ts.net:3900
+      - FORGEJO__packages__MINIO_ACCESS_KEY_ID=${GARAGE_KEY_ID}
+      - FORGEJO__packages__MINIO_SECRET_ACCESS_KEY=${GARAGE_SECRET_KEY}
+      - FORGEJO__packages__MINIO_BUCKET=forgejo-packages
+      - FORGEJO__packages__MINIO_USE_SSL=false
+      - FORGEJO__packages__MINIO_FORCE_PATH_STYLE=true
     volumes:
       - /mnt/nas/repo:/data # store repos on NAS
     ports:
@@ -282,7 +318,6 @@ services:
     restart: unless-stopped
     depends_on:
       - forgejo
-    command: ["forgejo-runner", "daemon", "--config", "/data/config.yml"]
     working_dir: /data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock  # Lets runner spawn containers for jobs
@@ -324,7 +359,6 @@ services:
     networks:
       - homelab
     # This appends to the Entrypoint: /app/agentgateway -f /etc/sentinel/config.yaml
-    command: ["-f", "/etc/sentinel/config.yaml"]
     expose:
       - "8080"
     # This makes it accessible via Caddy
@@ -496,6 +530,7 @@ volumes:
   phpsock:
   postgres_local_data:
   nocodb_data:
+  nats_data:
   docmost_data:
   aw_data:
   aw_config:

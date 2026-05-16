@@ -1,0 +1,9 @@
+FROM tailscale/tailscale:stable AS tailscale
+
+FROM n8nio/n8n:2.17.2 
+
+USER root
+
+COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/tailscale
+
+USER node

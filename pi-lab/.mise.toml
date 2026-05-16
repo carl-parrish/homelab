@@ -1,0 +1,4 @@
+[env]
+AWS_REGION = "garage"
+AWS_ENDPOINT_URL = "https://s3.cuttlefish-gorgon.ts.net"
+AWS_PROFILE = "garage"
