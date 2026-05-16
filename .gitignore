@@ -1,2 +1,20 @@
-# Secrets
-pi-lab/sentinel/config.yaml
+# Logs
+logs/
+*.log
+
+# Certificates
+*.crt
+*.key
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Screenshots
+*.png
+
+# Unused cert directory
+caddy_certs/docker-activitywatch/
+.env.bak
+.env.infra
+sentinel/config.yaml
